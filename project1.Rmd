@@ -1,0 +1,137 @@
+---
+title: "Course Project 1 for Reproducible Research"
+author: "Wilfredo"
+date: "May 14, 2018"
+output: html_document
+---
+
+##Objective
+The objective of the project is to analyze the data provided by an activity monitoring device. The device collected steps at five-miunte intervals from 2012-10-01 to 2012-11-30 from an unkown human subject
+
+##Reading data
+The original data can be found here: https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip.
+First, we need to read the data. We can do this by using read.csv and loading data to the variable "activity".
+We also want to transform the date variable to "date" format. We use the as.Date function for this.
+
+```{r }
+activity <- read.csv("activity.csv")
+activity$date <- as.Date(activity$date)
+
+```
+
+##What is mean total number of steps taken per day?
+We will like to know the total number of steps per day. An easy way of doing this is by using the dplyR package. So we load the package and use the summarize function within it. We will load the data into a new dataset called "total.steps". We can now build a histogram with that dataset to learn the frequency of how many steps/day the subject took.
+
+```{R total steps}
+library("dplyr")
+total.steps <- activity %>% group_by(date) %>% summarize(steps.per.day = sum(steps))
+hist(total.steps$steps.per.day, col = "blue", xlab = "Steps per day", main = "Histogram of Steps Per Day")
+```
+
+Now we want to know the mean and the median for all the dataset and per day. We can use the core functions for mean and median.
+
+```{R mean and median}
+mean(activity$steps, na.rm = T)
+median(activity$steps, na.rm = T)
+```
+
+We can use dplyR again for the daily calculations.
+```{R}
+mm <- activity %>% group_by(interval, date) %>% summarize(mean.steps.day = mean(steps))
+median <- activity %>% group_by(interval, date) %>% summarize(median.steps.day = median(steps))
+colnames(mm) <- c("interval","date","mean")
+colnames(median) <- c("interval","date","median")
+print(mm)
+print(median)
+```
+
+
+##What is the average daily activity pattern?
+
+Let's create a grapth with the same dataset created before.
+```{R graph of means and median}
+plot(mm$interval, mm$mean, col = "blue", xlab = "Interval", ylab = "Mean steps per day", type = "l")
+
+```
+
+Let's see exactly which one is the maximum value in the graph.
+```{R}
+print(mm[which.max(mm$mean),])
+plot(mm$interval, mm$mean, col = "blue", xlab = "Interval", ylab = "Mean steps per day", type = "l")
+points(615, 806, col = "red", pch = 19)
+```
+
+##Imputing missing values
+Let's calculate the % of missing values in the data.
+```{R missing values}
+mean(is.na(activity$steps))
+```
+13.1% of the entries are missing.
+
+Now, let's replace all the missing values with 0. I believe this is a valid strategy since missing values likely means that there was no activity.
+
+```{R replace missing value}
+activity[is.na(activity$steps),1] <- 0
+```
+We can now calculate the metrics again
+
+Let's start with the histogram.
+```{R total steps no NA}
+library("dplyr")
+total.steps <- activity %>% group_by(date) %>% summarize(steps.per.day = sum(steps))
+hist(total.steps$steps.per.day, col = "blue", xlab = "Steps per day", main = "Histogram of Steps Per Day")
+```
+
+Now the Mean and Median
+```{R mean and median no NA}
+mean(activity$steps)
+median(activity$steps)
+```
+
+Finally, the daily calculations.
+```{R no NA}
+mean <- activity %>% group_by(date) %>% summarize(mean.steps.day = mean(steps))
+median <- activity %>% group_by(date) %>% summarize(median.steps.day = median(steps))
+mm <- cbind(mean, median$median.steps.day)
+colnames(mm) <- c("date","mean", "median")
+```
+
+
+The mean dropped from 37.3826 to 32.47996. The median was kept at 0.
+
+##Are there differences in activity patterns between weekdays and weekends?
+Let's start by adding a new variable called 'day'. We will use another dplyR function for this.
+```{R weekday}
+weekday <- mutate(activity, day = weekdays(date))
+```
+Now let's create a two-level variable for weekday and weekend.
+```{R two-level}
+weekday$day[weekday$day == "Sunday" | weekday$day == "Saturday"] <- "Weekend"
+weekday$day[weekday$day != "Weekend"] <- "Weekday"
+
+```
+We need to calculate the average number of steps accross weekdays and weekends.
+
+```{R mean for weekdays and weekends}
+
+byday <- weekday %>% group_by(interval, day) %>% summarize(mean = mean(steps))
+
+```
+
+
+Now let's plot the data for weekday and weekends.For this, we will use the Lattice package.
+
+```{R final plot}
+
+library(lattice)
+xyplot(byday$mean~byday$interval|byday$day, 
+       main = "Steps by weekday and weekend", 
+       ylab = "Number of Steps", 
+       xlab = "Intervals",
+       layout = c(1,2),
+       type = "l")
+```
+
+
+
+
